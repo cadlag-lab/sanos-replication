@@ -1,0 +1,31 @@
+[project]
+name = "sanos-replication"
+version = "0.0.0"
+description = "Research replication of SANOS (arXiv:2601.11209) on Deribit option quotes."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy",
+    "scipy",
+]
+
+[build-system]
+requires = ["uv_build >= 0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "sanos"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "-ra"]
+strict = true
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
