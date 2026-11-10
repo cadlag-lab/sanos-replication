@@ -34,6 +34,7 @@ CHECK_STRIKES = np.linspace(0.02, 5.0, 800)
 
 
 def main() -> None:
+    commit = git_commit()  # before anything is written
     OUT.mkdir(parents=True, exist_ok=True)
     quotes = mixture_quotes(EXPIRIES, STRIKES, WEIGHTS, VOLS, HALF_SPREAD)
 
@@ -47,9 +48,9 @@ def main() -> None:
         )
         summary += [
             f"## {label}",
-            f"Fitted in {1000 * seconds:.0f} ms, model strikes at most {max_gap} apart.",
+            f"Fitted in {1000 * seconds:.0f} ms. Largest model strike gap: {max_gap}.",
             metrics_table(quotes, surfaces[label]),
-            "Largest arbitrage violation on the check grid, in price: "
+            "Largest arbitrage violations on the check grid: "
             + ", ".join(f"{name} {v:.0e}" for name, v in violations.items())
             + ".",
         ]
@@ -62,7 +63,7 @@ def main() -> None:
 
     header = [
         "# E0: synthetic quotes from a known model",
-        f"Produced by `experiments/e0_synthetic.py` at commit `{git_commit()}`.",
+        f"Produced by `experiments/e0_synthetic.py` at commit `{commit}`.",
         f"Model: mixture of Black-Scholes, weights {WEIGHTS}, volatilities {VOLS}. "
         f"Quotes: expiries {EXPIRIES}, {len(STRIKES)} strikes from {STRIKES[0]} to "
         f"{STRIKES[-1]}, mid = model price, half-spread {HALF_SPREAD}.",
