@@ -178,3 +178,11 @@ def test_calendar_arbitrage_in_the_quotes(eta):
     )
     violations = arbitrage_violations(surface.call, [1 / 12, 0.25, 0.5], CHECK_STRIKES)
     assert max(violations.values()) < 1e-9, violations
+
+
+@pytest.mark.parametrize("expiries", [1, 2])
+def test_fits_one_or_two_expiries(expiries):
+    # with one expiry there is no calendar condition, with two a single one
+    surface = fit(QUOTES[:expiries], eta=0.25, max_gap=0.02)
+    for q in QUOTES[:expiries]:
+        assert np.all(np.abs(surface.call(q.expiry, q.strikes) - q.mid) < HALF_SPREAD)

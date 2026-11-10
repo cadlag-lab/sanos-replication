@@ -5,6 +5,7 @@ description = "Research replication of SANOS (arXiv:2601.11209) on Deribit optio
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "matplotlib>=3.11.2",
     "numpy",
     "scipy",
 ]

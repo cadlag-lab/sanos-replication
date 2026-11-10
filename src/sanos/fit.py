@@ -124,10 +124,10 @@ def fit(
         blocks = [[None] * len(quotes) for _ in strikes[1:]]
         for j in range(1, len(quotes)):
             at = strikes[j][:, None]
-            blocks[j - 1][j - 1] = call(
-                strikes[j - 1], at, omega * smoothing[j - 1]
-            )  # R_j
-            blocks[j - 1][j] = -call(strikes[j], at, omega * smoothing[j])  # -U_j
+            previous = call(strikes[j - 1], at, omega * smoothing[j - 1])  # R_j
+            current = call(strikes[j], at, omega * smoothing[j])  # U_j
+            blocks[j - 1][j - 1] = sp.coo_array(previous)
+            blocks[j - 1][j] = sp.coo_array(-current)
         calendar = sp.bmat(blocks)
         a_ub.append(sp.hstack([calendar, no_quote_terms(calendar.shape[0])]))
         b_ub.append(np.zeros(calendar.shape[0]))
