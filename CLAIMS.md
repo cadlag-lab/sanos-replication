@@ -5,7 +5,7 @@ The "Result" column is filled in as experiments run, including the ones that fai
 
 | # | Claim | Paper | How we test it | Result |
 |---|---|---|---|---|
-| E0 | The fit recovers a known arbitrage-free surface | implicit | Synthetic quotes from Black–Scholes and a lognormal mixture; errors against the truth for prices and density | pending |
+| E0 | The fit recovers a known arbitrage-free surface | implicit | Synthetic quotes from Black–Scholes and a lognormal mixture; errors against the truth for prices and density | η = 0: holds for prices (`tests/test_fit.py`). η > 0 and density: pending |
 | E1 | Linear interpolation is "too expensive" between strikes | Fig. 2 | η = 0 against η = 0.25 implied vols between quoted strikes | pending |
 | E2 | η trades smoothness of the density against fit | Figs. 3–5, 8 | η ∈ {0, 0.06, 0.25} on a short, a mid and a long expiry | pending |
 | E3 | A full surface fits within bid/ask in under a second | §5: 91.4% inside bid/ask, median miss 21% of half-spread, under 1 s on 1000 SPX options | The same three numbers on each Deribit snapshot. The comparison is qualitative because the market differs | pending |
