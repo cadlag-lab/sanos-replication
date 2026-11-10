@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.special import ndtr
 
-from sanos.black_scholes import call
+from sanos.black_scholes import call, implied_variance
 
 STRIKES = np.linspace(0.2, 3.0, 57)
 
@@ -34,3 +34,16 @@ def test_shape_in_strike_and_variance():
     assert np.all(call(1.0, STRIKES, 0.05) > prices)  # increasing in variance
     # deep in the money the formula rounds to within one ulp of intrinsic
     assert np.all(prices >= np.maximum(1.0 - STRIKES, 0.0) - 1e-15)
+
+
+def test_implied_variance_inverts_the_call():
+    # near the money, where the time value is not lost to rounding
+    strikes = np.linspace(0.8, 1.25, 10)
+    variances = np.array([0.01, 0.09, 1.0])[:, None]
+    prices = call(1.0, strikes, variances)
+    assert np.allclose(implied_variance(strikes, prices), variances)
+
+
+def test_no_implied_variance_at_or_below_intrinsic():
+    assert np.isnan(implied_variance(0.5, 0.5))
+    assert np.isnan(implied_variance(1.2, 0.0))

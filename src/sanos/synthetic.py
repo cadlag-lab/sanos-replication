@@ -11,7 +11,7 @@ from collections.abc import Sequence
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from sanos.black_scholes import call
+from sanos.black_scholes import call, density
 from sanos.quotes import ExpiryQuotes
 
 
@@ -32,13 +32,13 @@ def mixture_density(
     k: ArrayLike, expiry: float, weights: Sequence[float], vols: Sequence[float]
 ) -> NDArray[np.float64]:
     """Density of Z_T at k > 0: the second strike derivative of the call price."""
-    k = np.asarray(k, dtype=float)
-    density = np.zeros(k.shape)
-    for w, vol in zip(weights, vols, strict=True):
-        v = vol**2 * expiry
-        d_minus = (-np.log(k) - 0.5 * v) / np.sqrt(v)
-        density += w * np.exp(-0.5 * d_minus**2) / (k * np.sqrt(2 * np.pi * v))
-    return density
+    return sum(
+        (
+            w * density(1.0, k, vol**2 * expiry)
+            for w, vol in zip(weights, vols, strict=True)
+        ),
+        start=np.zeros(np.shape(k)),
+    )
 
 
 def mixture_quotes(

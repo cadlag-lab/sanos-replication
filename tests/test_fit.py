@@ -1,16 +1,23 @@
-"""Claim E0 for eta = 0: the linear model recovers a known arbitrage-free surface."""
+"""Claim E0: the fit recovers a known arbitrage-free surface."""
+
+from dataclasses import replace
 
 import numpy as np
 import pytest
 
-from sanos.fit import fit
+from sanos.checks import arbitrage_violations
+from sanos.fit import atm_bid_variances, fit
 from sanos.grid import boundary_strikes, model_strikes
-from sanos.synthetic import mixture_call, mixture_quotes
+from sanos.synthetic import mixture_call, mixture_density, mixture_quotes
 
 WEIGHTS, VOLS = (0.6, 0.4), (0.3, 0.8)
 EXPIRIES = [0.25, 0.5, 1.0]
 STRIKES = np.linspace(0.6, 1.6, 21)
-QUOTES = mixture_quotes(EXPIRIES, STRIKES, WEIGHTS, VOLS, half_spread=1e-4)
+HALF_SPREAD = 1e-4
+QUOTES = mixture_quotes(EXPIRIES, STRIKES, WEIGHTS, VOLS, HALF_SPREAD)
+# for the arbitrage checks: beyond the quoted strikes and between the expiries
+CHECK_EXPIRIES = [0.1, 0.25, 0.4, 0.5, 0.75, 1.0]
+CHECK_STRIKES = np.linspace(0.02, 5.0, 800)
 
 
 def truth(expiry, k):
@@ -92,3 +99,82 @@ def test_smooth_fit_runs_and_stays_close_to_black_scholes():
         assert np.allclose(
             model, mixture_call(STRIKES, expiry, [1.0], [vol]), atol=1e-3
         )
+
+
+# The smooth model. Tolerances on the density are what this setup achieves, recorded
+# so that a regression shows; they are not claims of the paper.
+DENSITY_TOLERANCE = {0.06: 0.1, 0.25: 0.01}
+
+
+@pytest.fixture(scope="module", params=DENSITY_TOLERANCE)
+def smooth(request):
+    return fit(QUOTES, eta=request.param, max_gap=0.02)
+
+
+def test_backbone_variances_are_close_to_the_true_ones_at_the_money():
+    true = [truth(expiry, 1.0) for expiry in EXPIRIES]
+    backbone = atm_bid_variances(QUOTES)
+    assert np.all(np.diff(backbone) > 0)
+    for expiry, v, price in zip(EXPIRIES, backbone, true, strict=True):
+        assert (
+            0 < price - mixture_call(1.0, expiry, [1.0], [np.sqrt(v / expiry)]) < 2e-4
+        )
+
+
+def test_smooth_fit_is_inside_bid_ask(smooth):
+    for q in QUOTES:
+        model = smooth.call(q.expiry, q.strikes)
+        assert np.all(q.bid < model) and np.all(model < q.ask)
+
+
+def test_smooth_density_is_close_to_the_true_density(smooth):
+    eta = smooth.smoothing_variances[-1] / atm_bid_variances(QUOTES)[-1]
+    k = np.linspace(STRIKES[0], STRIKES[-1], 201)
+    for expiry in EXPIRIES:
+        true = mixture_density(k, expiry, WEIGHTS, VOLS)
+        error = np.abs(smooth.density(expiry, k) - true).max() / true.max()
+        assert error < DENSITY_TOLERANCE[round(eta, 2)]
+
+
+def test_density_is_the_second_strike_derivative_of_the_price(smooth):
+    k, h = np.linspace(0.5, 2.0, 16), 1e-3
+    for expiry in (0.25, 0.4):  # a model expiry, and one between two
+        up, mid, down = (smooth.call(expiry, k + d) for d in (h, 0.0, -h))
+        assert np.allclose(
+            (up - 2 * mid + down) / h**2, smooth.density(expiry, k), atol=1e-4
+        )
+
+
+def test_linear_model_has_no_density(linear):
+    with pytest.raises(ValueError):
+        linear.density(0.5, 1.0)
+
+
+def test_fitted_surfaces_are_arbitrage_free(linear, smooth):
+    for surface in (linear, smooth):
+        violations = arbitrage_violations(surface.call, CHECK_EXPIRIES, CHECK_STRIKES)
+        assert max(violations.values()) < 1e-9, violations
+
+
+@pytest.mark.parametrize("bid_ask", ["weight", "constrain", "penalize"])
+@pytest.mark.parametrize("omega", [0, 1])
+def test_every_setting_fits_arbitrage_free_quotes_inside_bid_ask(bid_ask, omega):
+    surface = fit(QUOTES, eta=0.25, max_gap=0.02, bid_ask=bid_ask, omega=omega)
+    for q in QUOTES:
+        assert np.all(np.abs(surface.call(q.expiry, q.strikes) - q.mid) < HALF_SPREAD)
+
+
+@pytest.mark.parametrize("eta", [0.0, 0.25])
+def test_calendar_arbitrage_in_the_quotes(eta):
+    # the one-year prices quoted for a one-month expiry: far above the three-month ones
+    arbitraged = [replace(QUOTES[-1], expiry=1 / 12), *QUOTES[:-1]]
+    with pytest.raises(RuntimeError, match="infeasible"):
+        fit(arbitraged, eta=eta, max_gap=0.02, bid_ask="constrain")
+    # without the hard constraint there is a fit, which has to leave bid/ask
+    surface = fit(arbitraged, eta=eta, max_gap=0.02)
+    assert any(
+        np.any(np.abs(surface.call(q.expiry, q.strikes) - q.mid) > HALF_SPREAD)
+        for q in arbitraged
+    )
+    violations = arbitrage_violations(surface.call, [1 / 12, 0.25, 0.5], CHECK_STRIKES)
+    assert max(violations.values()) < 1e-9, violations
