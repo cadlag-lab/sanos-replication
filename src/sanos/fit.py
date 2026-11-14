@@ -158,6 +158,12 @@ def fit(
         b_eq=b_eq,
         bounds=np.column_stack([np.zeros_like(upper), upper]),
         method="highs",
+        # The tightest the solver allows. At its default of 1e-7 the constraints, and
+        # with them the no-arbitrage conditions, only hold to about 1e-8 in price.
+        options={
+            "primal_feasibility_tolerance": 1e-10,
+            "dual_feasibility_tolerance": 1e-10,
+        },
     )
     if result.status != 0:
         raise RuntimeError(f"the linear program was not solved: {result.message}")

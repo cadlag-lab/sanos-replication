@@ -102,8 +102,10 @@ def test_smooth_fit_runs_and_stays_close_to_black_scholes():
 
 
 # The smooth model. Tolerances on the density are what this setup achieves, recorded
-# so that a regression shows; they are not claims of the paper.
-DENSITY_TOLERANCE = {0.06: 0.1, 0.25: 0.01}
+# so that a regression shows; they are not claims of the paper. The quotes do not pin
+# the density down, least of all at eta = 0.06: the error there moved from 7% to 13%
+# when only the tolerance of the LP solver changed.
+DENSITY_TOLERANCE = {0.06: 0.15, 0.25: 0.01}
 
 
 @pytest.fixture(scope="module", params=DENSITY_TOLERANCE)

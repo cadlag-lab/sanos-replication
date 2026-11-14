@@ -99,14 +99,19 @@ def plot_expiry(
     q: ExpiryQuotes,
     surfaces: Mapping[str, Surface],
     true_density: Callable[[NDArray[np.float64]], NDArray[np.float64]] | None = None,
+    k_range: tuple[float, float] | None = None,
 ) -> Figure:
     """One expiry in the layout of the paper's figure 1, for one or more surfaces.
 
     Panels: call prices, implied volatilities, density, and the fit error in
     half-spreads. The paper overlays the error on the first two panels with a second
-    axis; here it has its own panel.
+    axis; here it has its own panel. `k_range` is the range of strikes shown; the
+    default is the quoted range.
     """
-    k = np.linspace(q.strikes[0], q.strikes[-1], 300)
+    low, high = k_range or (q.strikes[0], q.strikes[-1])
+    k = np.linspace(low, high, 300)
+    seen = (q.strikes >= low) & (q.strikes <= high)
+    strikes, bid, ask = q.strikes[seen], q.bid[seen], q.ask[seen]
     figure = Figure(figsize=(16, 3.8), facecolor=PAPER, layout="constrained")
     prices, vols, density, errors = figure.subplots(1, 4)
 
@@ -114,14 +119,19 @@ def plot_expiry(
         return np.sqrt(implied_variance(strikes, price) / q.expiry)
 
     # the market: bid to ask as a bar, in prices and in implied volatilities
-    prices.vlines(q.strikes, q.bid, q.ask, color=INK, lw=1.2, label="bid to ask")
-    vols.vlines(
-        q.strikes, vol(q.strikes, q.bid), vol(q.strikes, q.ask), color=INK, lw=1.2
-    )
+    prices.vlines(strikes, bid, ask, color=INK, lw=1.2, label="bid to ask")
+    vols.vlines(strikes, vol(strikes, bid), vol(strikes, ask), color=INK, lw=1.2)
     at, implied = mid_density(q)
+    at, implied = at[seen[1:-1]], implied[seen[1:-1]]
     negative = implied < 0
     density.plot(
-        at[~negative], implied[~negative], ".", color=INK, ms=4, label="implied by mids"
+        at[~negative],
+        implied[~negative],
+        ".",
+        color=INK,
+        ms=4,
+        zorder=3,
+        label="implied by mids",
     )
     if negative.any():
         density.plot(
@@ -130,6 +140,7 @@ def plot_expiry(
             "x",
             color=ALERT,
             ms=6,
+            zorder=3,
             label="mids with arbitrage",
         )
     if true_density is not None:
@@ -139,7 +150,7 @@ def plot_expiry(
         model = surface.call(q.expiry, k)
         prices.plot(k, model, color=colour, lw=1.5, label=label)
         vols.plot(k, vol(k, model), color=colour, lw=1.5)
-        errors.plot(q.strikes, spread_errors(q, surface), "o", color=colour, ms=3.5)
+        errors.plot(strikes, spread_errors(q, surface)[seen], "o", color=colour, ms=3.5)
         j = int(np.searchsorted(surface.expiries, q.expiry))
         if surface.smoothing_variances[j] > 0:
             density.plot(k, surface.density(q.expiry, k), color=colour, lw=1.5)
