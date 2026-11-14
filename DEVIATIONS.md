@@ -1,8 +1,9 @@
 # Deviations from the paper
 
 Every place this replication differs from the paper. Each entry is written when the choice
-is made, with its reason. The data entries below were written after looking at the quotes
-of the first snapshot and before running any fit on them.
+is made, with its reason. The data entries below were written from the quotes of the first
+snapshot; they were committed with it (`7b2cd2d`), before the experiment script
+(`00b0398`). Their numbers are for that snapshot.
 
 ## Data
 
@@ -13,19 +14,20 @@ of the first snapshot and before running any fit on them.
   times forward. Deribit BTC options are quoted in BTC, which is already a price per unit
   of forward, so the quote is used as the pure price at pure strike K / F with no discount
   factor. This is the exchange's own convention: its mark prices of out-of-the-money
-  options are reproduced from its mark volatilities to a median of 4e-6 BTC and a maximum
-  of 2e-4 BTC, against a tick of 1e-4 (`tests/test_deribit.py`).
+  options are reproduced from its mark volatilities to a median of 2e-6 BTC and a maximum
+  of 4e-5 BTC, against a tick of 1e-4 (8e-6 and 1.2e-4 on the second snapshot;
+  `tests/test_deribit.py` holds every snapshot to a median below 1e-5 and a maximum below 2e-4).
 - **Forward.** The forward of an expiry is the `underlying_price` the exchange reports
-  (median over the expiry's instruments, which agree to 4e-5). The paper does not say how
+  (median over the expiry's instruments, which agree to 4e-5 relative to the forward). The paper does not say how
   its forwards are obtained. The forward implied by put-call parity at the three strikes
-  nearest the money differs from it by a median of 1.4e-4 and at most 6e-4, and the
+  nearest the money differs from it by a median of 1.4e-4 and at most 6e-4 relative to the forward, and the
   exchange's forward is inside the parity bid/ask at all 30 strikes checked.
 - **Time to expiry.** Calendar time to 08:00 UTC over 365 days, because the market trades
   every day. The paper counts business days, plus 20% of a day for AM-settled options.
 - **Filters.** The paper keeps out-of-the-money options with at least 100 lots traded on
   the day and Vega/√T of at least 0.1%, expiries with at least 20 such options, and in
   section 5 the 1000 options nearest the money within two standard deviations. We keep
-  out-of-the-money options that have a bid above the minimum tick of 1e-4 BTC, and
+  out-of-the-money options that have an ask, and a bid above the minimum tick of 1e-4 BTC, and
   expiries with at least 20 of them. A bid at the minimum tick is dropped because it is
   the lowest possible bid and does not locate the price; this plays the role of the
   paper's Vega filter. There is no volume filter, because the quotes are a live book and
