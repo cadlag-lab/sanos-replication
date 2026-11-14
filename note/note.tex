@@ -1,0 +1,146 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,graphicx,hyperref}
+\newcommand{\Call}{\operatorname{Call}}
+\newcommand{\snap}{../results/BTC_20261114T223158Z}
+
+\title{Replicating SANOS on Deribit BTC options}
+\author{Gabriel Borrego Rold\'an}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We reimplement the production model of SANOS (Buehler, Horvath, Kratsios, Limmer and Saqur,
+arXiv:2601.11209v4) and test seven of its claims, first on synthetic quotes from a known
+model and then on two snapshots of the Deribit BTC option book. Five claims hold, one holds
+on a smaller problem than the paper's, and one, sensible extrapolation beyond the quoted
+strikes, is not reproduced. The real-data evidence is thin: the two snapshots are four
+minutes apart, so they show one market state.
+\end{abstract}
+
+\section{The model}
+
+Write prices in the ``pure'' coordinates of the paper: strikes divided by the forward, so
+that a call price is $C(T,k)=\mathbb{E}[(Z_T-k)^+]$ for a positive martingale $Z$ with
+$Z_0=1$. For expiries $T_1<\dots<T_M$, SANOS sets
+\begin{equation}
+  \hat C(T_j,k)=\sum_{i=1}^{N_j} q_j^i\,\Call\bigl(K_j^i,k,\eta V_j\bigr),
+\end{equation}
+where $\Call(s,k,v)$ is the Black--Scholes price with spot $s$ and total variance $v$,
+the $K_j^i$ are model strikes, $V_j$ are increasing backbone variances, $\eta\in[0,1)$
+is a smoothness parameter, and each $q_j$ is a probability vector with
+$\sum_i q_j^iK_j^i=1$. The price is that of $Z_j=X_jY_j$ with $X_j\sim q_j$ discrete and
+$Y_j$ an independent unit-mean lognormal: a discrete distribution blurred multiplicatively.
+For $\eta=0$ it is linear interpolation of call prices.
+
+The surface is free of calendar arbitrage if the discrete call prices of the $q_j$ increase
+in $j$, which is linear in $q$:
+$\sum_i q_j^i(K_j^i-K)^+\ge\sum_i q_{j-1}^i(K_{j-1}^i-K)^+$ at the strikes $K=K_j^\ell$.
+The paper calls this $\omega=0$; imposing the inequality on the smoothed prices instead is
+$\omega=1$ and guarantees nothing between strikes. Since model prices are linear in $q$,
+fitting bid/ask quotes is a linear program. We use the paper's recommended objective: with
+weights $1/(\text{ask}-\text{bid})$, the distance outside bid/ask plus $10^{-8}$ times the
+distance to the mid.
+
+\section{What we did differently}
+
+The full list is in \texttt{DEVIATIONS.md}. The ones that matter for reading the results:
+\begin{itemize}
+\item \textbf{Market.} Deribit BTC options instead of end-of-day SPX. These are quoted in
+  BTC, which is already a price per unit of forward, so a quote is used as the pure price
+  at strike $K/F$. The exchange's own mark prices follow this convention to a median of
+  $4\times10^{-6}$ against a tick of $10^{-4}$.
+\item \textbf{Filters.} Out-of-the-money options with a bid above the minimum tick, and
+  expiries with at least 20 of them. They were fixed from the quotes before any fit.
+  There is no volume filter and no distance-to-the-money filter.
+\item \textbf{Model strikes.} The paper adds strikes without stating the rule. We add them
+  at most $0.1\sqrt{V_j}$ apart, up to $2\sqrt{V_j}$ beyond the outermost quotes.
+\item \textbf{Scope.} Model expiries are the quoted expiries. The generalized model, the
+  discrete-local-volatility parametrization and extrapolation in time are not implemented.
+\end{itemize}
+
+\section{Results}
+
+Synthetic quotes come from a mixture of two Black--Scholes models (3 expiries, 21
+strikes). Each Deribit snapshot has 374 quotes on 10 expiries from 2 to 313 days. Errors
+are in half-spreads; the claims were written down before the code.
+
+\begin{center}
+\begin{tabular}{@{}lp{4.7cm}p{8.3cm}@{}}
+\toprule
+ & Claim & Result \\
+\midrule
+E0 & The fit recovers a known surface & Holds for prices. The density is within 1\% of
+  the truth at $\eta=0.25$ and within 15\% at $\eta=0.06$, where the quotes do not pin
+  it down. \\
+E1 & Linear interpolation is too expensive between strikes & Holds. Halfway between
+  quoted strikes the linear fit's implied volatility is above the average of its two
+  neighbours at 99\% of 364 midpoints; for $\eta=0.25$ at 8--10\%. \\
+E2 & $\eta$ trades smoothness against fit & Holds. Density maxima on a short, mid and long
+  expiry: 3, 7, 3 at $\eta=0.06$ and 1, 2--3, 1 at $\eta=0.25$, both with every quote
+  inside bid/ask. A fit cost appears only at $\eta=0.5$. \\
+E3 & A full surface fits within bid/ask in under a second & Holds on a smaller problem:
+  100\% of 374 quotes inside bid/ask in 0.3\,s. The paper reports 91.4\% of 1000 SPX
+  quotes on 48 expiries. \\
+E4 & Extrapolation beyond the quotes is sensible & Not reproduced. Outside the quotes the
+  implied volatility depends on $\eta$ and on the snapshot by tens of points. \\
+E5 & Strictly arbitrage-free for $\omega=0$ & Holds. No violation above $2\times10^{-11}$
+  in price for $\omega=0$; up to $8\times10^{-5}$ in expiry for $\omega=1$. \\
+E6 & Mids show arbitrage that bid/ask does not & Holds. The mid-implied density is negative
+  at 43 and 46 of 354 strikes, while arbitrage-free prices exist inside bid/ask. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{\snap/e2_25DEC26.png}
+\caption{The 40-day expiry for three values of $\eta$. Crosses are strikes where three
+neighbouring mids imply a negative density.}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{\snap/e1_between_strikes.png}
+\caption{The same expiry near the money. The linear fit bumps upwards between quoted
+strikes.}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{\snap/e4_17NOV26.png}
+\caption{The 2-day expiry, two at-the-money standard deviations beyond its quotes. The
+three fits agree where there are quotes and nowhere else.}
+\end{figure}
+
+\section{What we learned}
+
+\begin{itemize}
+\item \textbf{The grid is part of the model.} With model strikes only at the quoted
+  strikes, the smooth fit misses synthetic quotes and the linear fit misses the lowest
+  one or two real quotes of 7 or 8 of the 10 expiries. Both disappear on a grid finer than the smoothing width
+  $\sqrt{\eta V_j}$. The paper leaves this rule unstated.
+\item \textbf{The fit is not unique.} The linear program has many optimal solutions once
+  every quote is inside bid/ask, because the remaining objective is $10^{-8}$ times the
+  distance to the mid. Which one the solver returns moved the synthetic density error at
+  $\eta=0.06$ from 7\% to 13\%, and it is what makes the extrapolation unstable.
+\item \textbf{``Strictly'' depends on the solver.} At the default tolerance of the solver
+  the $\omega=0$ surface violated the conditions by up to $2\times10^{-8}$. At its tightest
+  tolerance the violations are rounding error.
+\item \textbf{An infeasible program is not an arbitrage.} The hard bid/ask constraint is
+  infeasible for the linear model on the quoted strikes and feasible on the denser grid.
+\end{itemize}
+
+\section{Limits}
+
+Two snapshots four minutes apart on a Saturday evening are one sample. The claims that
+depend on the market (E1--E4, E6) should be rerun on snapshots from different days before
+being relied on; capturing one is a single command. Only BTC was used. The paper's problem
+size (48 expiries, 1000 quotes) was not reached, so the runtime claim is untested at that
+scale. Everything here is regenerated from the frozen snapshots by two scripts in
+\texttt{experiments/}.
+
+\end{document}

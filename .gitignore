@@ -5,3 +5,8 @@ __pycache__/
 dist/
 # the papers are not ours to redistribute; get them from arXiv (see README)
 _docs/
+note/*.aux
+note/*.log
+note/*.out
+note/*.fls
+note/*.fdb_latexmk
