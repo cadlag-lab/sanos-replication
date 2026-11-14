@@ -52,9 +52,9 @@ The full list is in \texttt{DEVIATIONS.md}. The ones that matter for reading the
 \item \textbf{Market.} Deribit BTC options instead of end-of-day SPX. These are quoted in
   BTC, which is already a price per unit of forward, so a quote is used as the pure price
   at strike $K/F$. The exchange's own mark prices follow this convention to a median of
-  $4\times10^{-6}$ against a tick of $10^{-4}$.
+  $2\times10^{-6}$ BTC against a tick of $10^{-4}$.
 \item \textbf{Filters.} Out-of-the-money options with a bid above the minimum tick, and
-  expiries with at least 20 of them. They were fixed from the quotes before any fit.
+  expiries with at least 20 of them. They were fixed from the quotes of the first snapshot.
   There is no volume filter and no distance-to-the-money filter.
 \item \textbf{Model strikes.} The paper adds strikes without stating the rule. We add them
   at most $0.1\sqrt{V_j}$ apart, up to $2\sqrt{V_j}$ beyond the outermost quotes.
