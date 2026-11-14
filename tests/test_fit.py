@@ -186,3 +186,20 @@ def test_fits_one_or_two_expiries(expiries):
     surface = fit(QUOTES[:expiries], eta=0.25, max_gap=0.02)
     for q in QUOTES[:expiries]:
         assert np.all(np.abs(surface.call(q.expiry, q.strikes) - q.mid) < HALF_SPREAD)
+
+
+def test_gaps_are_filled_only_within_reach_of_the_quotes():
+    strikes = model_strikes(
+        np.array([0.9, 1.0, 1.1]), 0.1, 5.0, max_gap=0.05, reach=0.1
+    )
+    assert np.allclose(
+        strikes, [0.1, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2, 5.0]
+    )
+
+
+def test_boundary_strikes_survive_tied_mids_at_the_wings():
+    q = QUOTES[0]
+    bid, ask = q.bid.copy(), q.ask.copy()
+    bid[-1], ask[-1] = bid[-2], ask[-2]  # the last two mids are equal, as with ticks
+    k_min, k_max = boundary_strikes([replace(q, bid=bid, ask=ask)])
+    assert 0 < k_min < STRIKES[0] and STRIKES[-1] < k_max

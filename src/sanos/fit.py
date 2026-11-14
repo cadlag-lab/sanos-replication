@@ -47,7 +47,8 @@ def fit(
     quotes: Sequence[ExpiryQuotes],
     eta: float = 0.0,
     variances: ArrayLike | None = None,
-    max_gap: float = np.inf,
+    max_gap: ArrayLike = np.inf,
+    reach: ArrayLike = np.inf,
     bid_ask: Literal["weight", "constrain", "penalize"] = "penalize",
     omega: Literal[0, 1] = 0,
 ) -> Surface:
@@ -56,7 +57,8 @@ def fit(
     `eta` is the smoothness; 0 is the linear model of section 2.2.
     `variances` are the backbone variances V_j, one per expiry and non-decreasing.
     The default is `atm_bid_variances`. They do not matter when eta = 0.
-    `max_gap` is the largest allowed distance between neighbouring model strikes.
+    `max_gap` is the largest allowed distance between neighbouring model strikes, up
+    to `reach` beyond the outermost quoted strikes. Both can be given per expiry.
     `bid_ask` picks the treatment of bid/ask of remark 4.1, see `BID_ASK`.
     `omega` = 0 imposes the calendar condition on the densities, which guarantees
     absence of arbitrage; 1 imposes it on the smoothed prices, which does not.
@@ -74,7 +76,11 @@ def fit(
     assert np.all(np.diff(expiries) > 0) and np.all(np.diff(smoothing) >= 0)
 
     k_min, k_max = boundary_strikes(quotes)
-    strikes = [model_strikes(q.strikes, k_min, k_max, max_gap) for q in quotes]
+    gaps, reaches = (np.broadcast_to(x, len(quotes)) for x in (max_gap, reach))
+    strikes = [
+        model_strikes(q.strikes, k_min, k_max, gap, far)
+        for q, gap, far in zip(quotes, gaps, reaches, strict=True)
+    ]
 
     # Unknowns, all non-negative: the densities q_1..q_M, then three numbers per quote:
     # the distance of the model price to the mid, how far it is above the ask, and how
