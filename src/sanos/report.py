@@ -78,7 +78,7 @@ def metrics_table(quotes: Sequence[ExpiryQuotes], surface: Surface) -> str:
 
 
 def git_commit() -> str:
-    """The commit that produced a result, marked if the working tree differs from it."""
+    """The commit that produced a result, marked if the code or data differ from it."""
 
     def git(*args: str) -> str:
         return subprocess.run(
@@ -86,7 +86,8 @@ def git_commit() -> str:
         ).stdout.strip()
 
     return git("rev-parse", "--short", "HEAD") + (
-        "-dirty" if git("status", "--porcelain") else ""
+        # results/ is output: regenerating it does not change what produced it
+        "-dirty" if git("status", "--porcelain", "--", ".", ":!results") else ""
     )
 
 
